@@ -1,5 +1,9 @@
 # Truststore
 
+> **Note**<br/>
+> This is a fork of the [`truststore`](https://github.com/sethmlarson/truststore) package,
+> which adds additional configuration options for Robocorp projects
+
 [![PyPI](https://img.shields.io/pypi/v/truststore)](https://pypi.org/project/truststore)
 [![CI](https://github.com/sethmlarson/truststore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sethmlarson/truststore/actions/workflows/ci.yml)
 
