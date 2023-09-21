@@ -79,6 +79,10 @@ class SSLContext(_truststore_SSLContext_super_class):  # type: ignore[misc]
 
         self._ctx.sslobject_class = TruststoreSSLObject
 
+        # Robocorp environment configuration
+        if os.getenv("RC_TLS_LEGACY_RENEGOTIATION_ALLOWED"):
+            self.options |= 0x4  # OP_LEGACY_SERVER_CONNECT
+
     def wrap_socket(
         self,
         sock: socket.socket,
