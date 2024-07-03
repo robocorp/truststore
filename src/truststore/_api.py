@@ -12,7 +12,6 @@ from ._ssl_constants import (
     _original_super_SSLContext,
     _truststore_SSLContext_dunder_class,
     _truststore_SSLContext_super_class,
-    _verify_mode,
 )
 
 if platform.system() == "Windows":
@@ -274,7 +273,7 @@ class SSLContext(_truststore_SSLContext_super_class):  # type: ignore[misc]
 
     @verify_mode.setter
     def verify_mode(self, value: ssl.VerifyMode) -> None:
-        _verify_mode.__set__(  # type: ignore[attr-defined]
+        _original_super_SSLContext.verify_mode.__set__(  # type: ignore[attr-defined]
             self._ctx, value
         )
 
