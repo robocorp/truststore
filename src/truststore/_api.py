@@ -273,6 +273,8 @@ class SSLContext(_truststore_SSLContext_super_class):  # type: ignore[misc]
 
     @verify_mode.setter
     def verify_mode(self, value: ssl.VerifyMode) -> None:
+        msg = f"{type(self)}:{type(self).__mro__}; {_original_SSLContext}: {_original_SSLContext.__mro__}"
+        raise Exception(msg)
         _original_super_SSLContext.verify_mode.__set__(  # type: ignore[attr-defined]
             self._ctx, value
         )
