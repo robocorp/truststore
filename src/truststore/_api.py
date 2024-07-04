@@ -273,7 +273,9 @@ class SSLContext(_truststore_SSLContext_super_class):  # type: ignore[misc]
 
     @verify_mode.setter
     def verify_mode(self, value: ssl.VerifyMode) -> None:
-        super(_original_SSLContext, _original_SSLContext).verify_mode.__set__(self._ctx, value)
+        _original_super_SSLContext.verify_mode.__set__(  # type: ignore[attr-defined]
+            self._ctx, value
+        )
 
 
 # Python 3.13+ makes get_unverified_chain() a public API that only returns DER

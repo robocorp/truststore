@@ -1,13 +1,11 @@
 import ssl
 import sys
 import typing
-from _ssl import _SSLContext
 
 # Hold on to the original class so we can create it consistently
 # even if we inject our own SSLContext into the ssl module.
-# SSLContextCopy = type("SSLContextCopy", ssl.SSLContext.__bases__, dict(ssl.SSLContext.__dict__))
 _original_SSLContext = ssl.SSLContext
-_original_super_SSLContext = _SSLContext
+_original_super_SSLContext = _original_SSLContext.__mro__[1]
 
 # CPython is known to be good, but non-CPython implementations
 # may implement SSLContext differently so to be safe we don't
