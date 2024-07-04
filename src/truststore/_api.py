@@ -3,6 +3,7 @@ import platform
 import socket
 import ssl
 import sys
+import types
 import typing
 
 import _ssl  # type: ignore[import-not-found]
@@ -29,7 +30,7 @@ _StrOrBytesPath: typing.TypeAlias = str | bytes | os.PathLike[str] | os.PathLike
 _PasswordType: typing.TypeAlias = str | bytes | typing.Callable[[], str | bytes]
 
 
-def _override_ssl_class(module):
+def _override_ssl_class(module: types.ModuleType) -> None:
     if cls := getattr(module, "SSLContext"):
         if getattr(cls, "TRUSTSTORE_OVERRIDE", False):
             return
