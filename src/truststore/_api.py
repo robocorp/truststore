@@ -29,17 +29,25 @@ _StrOrBytesPath: typing.TypeAlias = str | bytes | os.PathLike[str] | os.PathLike
 _PasswordType: typing.TypeAlias = str | bytes | typing.Callable[[], str | bytes]
 
 
+def _override_ssl_class(module):
+    if cls := getattr(module, "SSLContext"):
+        if getattr(cls, "TRUSTSTORE_OVERRIDE", False):
+            return
+
+    setattr(module, "SSLContext", SSLContext)
+
+
 def inject_into_ssl() -> None:
     """Injects the :class:`truststore.SSLContext` into the ``ssl``
     module by replacing :class:`ssl.SSLContext`.
     """
-    setattr(ssl, "SSLContext", SSLContext)
+    _override_ssl_class(ssl)
     # urllib3 holds on to its own reference of ssl.SSLContext
     # so we need to replace that reference too.
     try:
         import urllib3.util.ssl_ as urllib3_ssl
 
-        setattr(urllib3_ssl, "SSLContext", SSLContext)
+        _override_ssl_class(urllib3_ssl)
     except ImportError:
         pass
 
@@ -57,6 +65,8 @@ def extract_from_ssl() -> None:
 
 class SSLContext(_truststore_SSLContext_super_class):  # type: ignore[misc]
     """SSLContext API that uses system certificates on all platforms"""
+
+    TRUSTSTORE_OVERRIDE = True
 
     @property  # type: ignore[misc]
     def __class__(self) -> type:
