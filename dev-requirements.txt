@@ -4,7 +4,10 @@ pytest
 pytest-asyncio
 pytest-httpserver
 urllib3
-trustme
 requests
 flaky
 httpx
+trustme
+
+# Temporary stop-gap until cffi supports 3.13
+cffi @ https://github.com/python-cffi/cffi/archive/refs/heads/main.zip; python_version > "3.12"

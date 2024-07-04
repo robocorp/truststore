@@ -39,6 +39,12 @@ Truststore **requires Python 3.10 or later** and supports the following platform
 
 ## User Guide
 
+```{warning}
+**PLEASE READ:** `inject_into_ssl()` **must not be used by libraries or packages** as it will cause issues on import time when integrated with other libraries.
+Libraries and packages should instead use `truststore.SSLContext` directly which is detailed below. 
+The `inject_into_ssl()` function is intended only for use in applications and scripts.
+```
+
 You can inject `truststore` into the standard library `ssl` module so the functionality is used
 by every library by default. To do so use the `truststore.inject_into_ssl()` function.
 
@@ -134,8 +140,9 @@ import truststore
 
 truststore.inject_into_ssl()
 
-http = aiohttp.ClientSession()
-resp = await http.request("GET", "https://example.com")
+async with aiohttp.ClientSession() as http_client:
+    async with http_client.get("https://example.com") as http_response:
+        ...
 ```
 
 If you'd like to use the `truststore.SSLContext` directly you can pass
@@ -148,8 +155,9 @@ import truststore
 
 ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
-http = aiohttp.ClientSession(ssl=ctx)
-resp = await http.request("GET", "https://example.com")
+async with aiohttp.ClientSession(ssl=ctx) as http_client:
+    async with http_client.get("https://example.com") as http_response:
+        ...
 ```
 
 ### Using truststore with Requests

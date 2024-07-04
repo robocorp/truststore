@@ -13,13 +13,13 @@ import aiohttp
 import aiohttp.client_exceptions
 import pytest
 import requests
-import trustme
 import urllib3
 import urllib3.exceptions
-from OpenSSL.crypto import X509
+from pytest_httpserver import HTTPServer
 
 import truststore
 from tests import SSLContextAdapter
+from tests.conftest import decorator_requires_internet
 
 pytestmark = pytest.mark.flaky
 
@@ -27,7 +27,10 @@ pytestmark = pytest.mark.flaky
 # if the client drops the connection due to a cert verification error
 socket.setdefaulttimeout(10)
 
-successful_hosts = pytest.mark.parametrize("host", ["example.com", "1.1.1.1"])
+
+successful_hosts = decorator_requires_internet(
+    pytest.mark.parametrize("host", ["example.com", "1.1.1.1"])
+)
 
 
 @dataclass
@@ -118,8 +121,10 @@ failure_hosts_list = [
     ),
 ]
 
-failure_hosts_no_revocation = pytest.mark.parametrize(
-    "failure", failure_hosts_list.copy(), ids=attrgetter("host")
+failure_hosts_no_revocation = decorator_requires_internet(
+    pytest.mark.parametrize(
+        "failure", failure_hosts_list.copy(), ids=attrgetter("host")
+    )
 )
 
 if platform.system() != "Linux":
@@ -133,29 +138,55 @@ if platform.system() != "Linux":
                 # "The certificate is revoked.",
                 # TODO: Temporary while certificate is expired on badssl.com.
                 # Test will start failing against once the certificate is fixed.
+                # macOS
                 '"revoked.badssl.com","RapidSSL TLS DV RSA Mixed SHA256 2020 CA-1","DigiCert Global Root CA" certificates do not meet pinning requirements',
+                "“revoked.badssl.com” certificate is expired",
+                # Windows
                 "A required certificate is not within its validity period when verifying against the current system clock or the timestamp in the signed file.",
             ],
         )
     )
 
-failure_hosts = pytest.mark.parametrize(
-    "failure", failure_hosts_list, ids=attrgetter("host")
+failure_hosts = decorator_requires_internet(
+    pytest.mark.parametrize("failure", failure_hosts_list, ids=attrgetter("host"))
 )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def trustme_ca():
+    # 'trustme' is optional to allow testing on Python 3.13
+    try:
+        import trustme
+    except ImportError:
+        pytest.skip("Test requires 'trustme' to be installed")
+
     ca = trustme.CA()
     yield ca
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def httpserver_ssl_context(trustme_ca):
     server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     server_cert = trustme_ca.issue_cert("localhost")
     server_cert.configure_cert(server_context)
     return server_context
+
+
+# Changes pytest-httpserver fixture to be scope='function' instead of 'session'.
+@pytest.fixture(scope="function")
+def make_httpserver(httpserver_listen_address, httpserver_ssl_context):
+    host, port = httpserver_listen_address
+    if not host:
+        host = HTTPServer.DEFAULT_LISTEN_HOST
+    if not port:
+        port = HTTPServer.DEFAULT_LISTEN_PORT
+
+    server = HTTPServer(host=host, port=port, ssl_context=httpserver_ssl_context)
+    server.start()
+    yield server
+    server.clear()
+    if server.is_running():
+        server.stop()
 
 
 def connect_to_host(
@@ -180,6 +211,34 @@ def test_success(host):
 def test_failures(failure):
     with pytest.raises(ssl.SSLCertVerificationError) as e:
         connect_to_host(failure.host)
+
+    error_repr = repr(e.value)
+    assert any(message in error_repr for message in failure.error_messages), error_repr
+
+
+@successful_hosts
+def test_success_after_loading_additional_anchors(host, trustme_ca):
+    with socket.create_connection((host, 443)) as sock:
+        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+
+        # See if loading additional anchors still uses system anchors.
+        trustme_ca.configure_trust(ctx)
+        with ctx.wrap_socket(sock, server_hostname=host):
+            pass
+
+
+@failure_hosts
+def test_failure_after_loading_additional_anchors(failure, trustme_ca):
+    with (
+        pytest.raises(ssl.SSLCertVerificationError) as e,
+        socket.create_connection((failure.host, 443)) as sock,
+    ):
+        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+
+        # See if loading additional anchors still fails.
+        trustme_ca.configure_trust(ctx)
+        with ctx.wrap_socket(sock, server_hostname=failure.host):
+            pass
 
     error_repr = repr(e.value)
     assert any(message in error_repr for message in failure.error_messages), error_repr
@@ -300,6 +359,8 @@ def test_trustme_cert(trustme_ca, httpserver):
 
 
 def test_trustme_cert_loaded_via_capath(trustme_ca, httpserver):
+    from OpenSSL.crypto import X509
+
     ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     with tempfile.TemporaryDirectory() as capath:
         with open(f"{capath}/cert.pem", "wb") as certfile:
@@ -318,6 +379,7 @@ def test_trustme_cert_loaded_via_capath(trustme_ca, httpserver):
         assert len(resp.data) > 0
 
 
+@pytest.mark.internet
 def test_trustme_cert_still_uses_system_certs(trustme_ca):
     ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     trustme_ca.configure_trust(ctx)
